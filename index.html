@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MY BRAND STORE</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Supabase JS Client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- QRCode Generator Library -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans min-h-screen flex flex-col">
+
+  <!-- Header -->
+  <header class="bg-white shadow-sm sticky top-0 z-10">
+    <div class="max-w-4xl mx-auto px-4 py-3.5 flex justify-between items-center gap-2">
+      <h1 id="header-store-name" class="text-lg sm:text-xl font-bold tracking-tight truncate">MY BRAND STORE</h1>
+      <div class="flex items-center gap-2 shrink-0">
+        <button type="button" onclick="openTrackingModal()" class="text-xs sm:text-sm font-medium bg-gray-100 hover:bg-gray-200 text-gray-800 px-3 py-1.5 rounded-full transition flex items-center gap-1">
+          <span>📦</span>
+          <span>เช็กพัสดุ</span>
+        </button>
+        <div class="text-xs sm:text-sm font-medium bg-black text-white px-3 py-1.5 rounded-full">
+          ตะกร้า: <span id="cart-count">0</span> ชิ้น
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-4xl w-full mx-auto px-4 py-8 grid grid-cols-1 md:grid-cols-3 gap-8 flex-1">
+    
+    <!-- ส่วนแสดงสินค้า (2 คอลัมน์) -->
+    <section class="md:col-span-2">
+      <div class="flex flex-wrap items-baseline justify-between gap-2 mb-4">
+        <h2 class="text-lg font-semibold">สินค้าทั้งหมด</h2>
+        <p class="text-xs text-gray-500">ค่าส่ง 1–10 ชิ้น: +30 ฿ | 11 ชิ้นขึ้นไป: +50 ฿</p>
+      </div>
+      <div id="product-list" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <p class="text-sm text-gray-400 col-span-full py-8 text-center">กำลังโหลดรายการสินค้า...</p>
+      </div>
+    </section>
+
+    <!-- ส่วนตะกร้าและชำระเงิน (1 คอลัมน์) -->
+    <section class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 h-fit">
+      <h2 class="text-lg font-semibold mb-3">สรุปคำสั่งซื้อ</h2>
+
+      <!-- แถบกระตุ้นยอดซื้อ (Upsell Bar) -->
+      <div id="upsell-box" class="hidden mb-4 bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs">
+        <p id="upsell-text" class="font-medium text-amber-800 mb-1.5"></p>
+        <div class="w-full bg-amber-200/70 rounded-full h-1.5 overflow-hidden">
+          <div id="upsell-bar" class="bg-amber-500 h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <div id="cart-items" class="space-y-3 text-sm text-gray-600 mb-4 border-b pb-4">
+        <p class="text-gray-400">ยังไม่มีสินค้าในตะกร้า</p>
+      </div>
+
+      <div class="space-y-1.5 text-sm mb-3 border-b pb-3">
+        <div class="flex justify-between text-gray-600">
+          <span>ค่าสินค้า</span>
+          <span id="subtotal-price">0 ฿</span>
+        </div>
+        <div class="flex justify-between text-gray-600">
+          <span id="shipping-label">ค่าจัดส่ง (1–10 ชิ้น +30 ฿ / 11+ ชิ้น +50 ฿)</span>
+          <span id="shipping-price">0 ฿</span>
+        </div>
+      </div>
+      
+      <div class="flex justify-between font-bold text-lg mb-4">
+        <span>ยอดรวมสุทธิ</span>
+        <span id="total-price">0 ฿</span>
+      </div>
+
+      <!-- ส่วนแสดง QR Code พร้อมเพย์และฟอร์มแจ้งโอน -->
+      <div id="payment-section" class="hidden space-y-4">
+        <div class="bg-blue-50 border border-blue-100 p-4 rounded-xl text-center space-y-2">
+          <div class="inline-block bg-[#113566] text-white text-[11px] font-semibold px-3 py-0.5 rounded-full tracking-wide">
+            Thai QR Payment / พร้อมเพย์
+          </div>
+          
+          <div class="bg-white p-2.5 rounded-lg inline-block shadow-sm border border-blue-100">
+            <img id="promptpay-qr-img" src="" alt="PromptPay QR Code" class="w-44 h-44 mx-auto">
+            <p class="text-[11px] text-gray-500 mt-1">ยอดโอน <span id="qr-amount-badge" class="font-bold text-blue-700">0</span> บาท</p>
+          </div>
+
+          <div class="space-y-0.5">
+            <p id="account-name-display" class="text-sm font-semibold text-gray-800"></p>
+            <p class="text-xs text-gray-600">เบอร์พร้อมเพย์: <span id="promptpay-display" class="font-bold text-blue-700"></span></p>
+          </div>
+
+          <div class="flex justify-center gap-2 pt-1">
+            <button type="button" onclick="downloadQR()" class="bg-blue-600 text-white text-xs px-3 py-1.5 rounded-full hover:bg-blue-700 transition">
+              บันทึกรูป QR
+            </button>
+            <button type="button" onclick="copyPromptPay()" class="bg-white border border-blue-200 text-blue-600 text-xs px-3 py-1.5 rounded-full hover:bg-blue-100 transition">
+              คัดลอกเบอร์
+            </button>
+          </div>
+        </div>
+
+        <!-- ฟอร์มแจ้งโอนและที่อยู่ -->
+        <form id="checkout-form" class="space-y-3 text-sm">
+          <div>
+            <label class="block font-medium mb-1">ชื่อ-นามสกุล ผู้รับ</label>
+            <input type="text" id="cust-name" required class="w-full border rounded-lg p-2" placeholder="ระบุชื่อผู้รับ">
+          </div>
+          <div>
+            <label class="block font-medium mb-1">เบอร์โทรศัพท์ <span class="text-xs font-normal text-gray-400">(ใช้เช็กเลขพัสดุ)</span></label>
+            <input type="tel" id="cust-phone" required class="w-full border rounded-lg p-2" placeholder="08X-XXX-XXXX">
+          </div>
+          <div>
+            <label class="block font-medium mb-1">ที่อยู่จัดส่ง</label>
+            <textarea id="cust-address" required rows="2" class="w-full border rounded-lg p-2" placeholder="บ้านเลขที่ ถนน ตำบล อำเภอ จังหวัด รหัสไปรษณีย์"></textarea>
+          </div>
+          <div>
+            <label class="block font-medium mb-1">แนบสลิปโอนเงิน <span class="text-xs font-normal text-gray-400">(ไม่เกิน 5MB)</span></label>
+            <input type="file" id="slip-file" accept="image/*" required class="w-full text-xs file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200">
+            
+            <div id="slip-preview-box" class="hidden mt-2 border border-gray-200 rounded-lg p-2 bg-gray-50 text-center">
+              <p class="text-[11px] text-gray-500 mb-1">ตัวอย่างสลิปที่เลือก:</p>
+              <img id="slip-preview-img" src="" alt="ตัวอย่างสลิป" class="max-h-48 mx-auto rounded object-contain shadow-sm">
+              <button type="button" onclick="clearSlipPreview()" class="mt-1.5 text-xs text-red-500 hover:underline">
+                ลบรูป / เลือกใหม่
+              </button>
+            </div>
+          </div>
+          <button type="submit" id="submit-btn" class="w-full bg-black text-white py-2.5 rounded-lg font-medium hover:bg-gray-800 transition">
+            ยืนยันการสั่งซื้อ
+          </button>
+        </form>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer ช่องทางติดต่อร้านค้า -->
+  <footer class="bg-white border-t border-gray-200 mt-12">
+    <div class="max-w-4xl mx-auto px-4 py-8 text-center space-y-4">
+      <div>
+        <h3 id="footer-store-name" class="font-bold text-gray-900 text-base tracking-tight">MY BRAND STORE</h3>
+        <p id="footer-tagline" class="text-xs text-gray-500 mt-1"></p>
+      </div>
+
+      <div id="social-links-container" class="flex flex-wrap justify-center gap-2.5"></div>
+
+      <p class="text-[11px] text-gray-400">
+        พบปัญหาการสั่งซื้อ แนบสลิปผิด หรือต้องการสอบถามเพิ่มเติม สามารถติดต่อร้านค้าได้ทุกช่องทางด้านบน
+      </p>
+      <p class="text-[11px] text-gray-300">
+        © <span id="footer-year"></span> <span id="footer-copy-name"></span>. All rights reserved.
+      </p>
+    </div>
+  </footer>
+
+  <!-- หน้าต่างเช็กสถานะออเดอร์และเลขพัสดุ (Order Tracking Modal) -->
+  <div id="tracking-modal" onclick="if(event.target === this) closeTrackingModal()" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4 max-h-[88vh] flex flex-col">
+      <div class="flex items-center justify-between border-b pb-3">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">📦</span>
+          <h3 class="text-lg font-bold text-gray-900">เช็กสถานะคำสั่งซื้อ / เลขพัสดุ</h3>
+        </div>
+        <button type="button" onclick="closeTrackingModal()" class="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-500 font-bold">
+          ✕
+        </button>
+      </div>
+
+      <form id="tracking-form" class="flex gap-2">
+        <input 
+          type="tel" 
+          id="track-phone-input" 
+          required 
+          placeholder="กรอกเบอร์โทรศัพท์ที่ใช้สั่งซื้อ..." 
+          class="flex-1 border border-gray-300 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:border-black"
+        >
+        <button type="submit" id="track-search-btn" class="bg-black text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-800 transition shrink-0">
+          ค้นหา
+        </button>
+      </form>
+
+      <div id="tracking-results" class="overflow-y-auto space-y-3 pr-1 flex-1 text-sm">
+        <p class="text-center text-gray-400 text-xs py-6">
+          กรอกเบอร์โทรศัพท์ที่คุณใช้ตอนสั่งซื้อ เพื่อตรวจสอบสถานะการจัดส่งและเลขพัสดุ
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- หน้าต่างขยายรูปเต็มจอ + ซูมภาพ (Full-Screen Image Lightbox) -->
+  <div id="image-lightbox" onclick="if(event.target === this) closeImageLightbox()" class="hidden fixed inset-0 bg-black/90 z-50 flex flex-col justify-between p-4 select-none">
+    <div class="flex items-center justify-between text-white z-10 max-w-4xl w-full mx-auto">
+      <span class="text-xs text-gray-300 bg-white/10 px-3 py-1.5 rounded-full">
+        คลิกที่รูปเพื่อซูมขยาย / ลากเพื่อเลื่อนดูรายละเอียด
+      </span>
+      <div class="flex items-center gap-2">
+        <button type="button" onclick="toggleLightboxZoom()" id="lightbox-zoom-btn" class="bg-white/15 hover:bg-white/25 text-white text-xs px-3.5 py-1.5 rounded-full transition font-medium">
+          🔍 ซูมขยาย (2x)
+        </button>
+        <button type="button" onclick="closeImageLightbox()" class="w-9 h-9 bg-white/15 hover:bg-white/30 rounded-full flex items-center justify-center text-white font-bold text-base transition">
+          ✕
+        </button>
+      </div>
+    </div>
+
+    <div onclick="if(event.target === this) closeImageLightbox()" class="flex-1 flex items-center justify-center overflow-hidden my-2">
+      <img 
+        id="lightbox-img" 
+        src="" 
+        alt="" 
+        draggable="false"
+        class="max-h-[74vh] max-w-[92vw] object-contain rounded-lg transition-transform duration-200 ease-out cursor-zoom-in"
+      >
+    </div>
+
+    <div class="bg-white/10 backdrop-blur-md border border-white/15 rounded-2xl p-3.5 max-w-xl w-full mx-auto text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 z-10">
+      <div class="min-w-0">
+        <div class="flex items-center gap-2">
+          <h3 id="lightbox-name" class="font-bold text-sm sm:text-base truncate"></h3>
+          <span id="lightbox-price" class="text-amber-300 font-bold text-sm shrink-0"></span>
+        </div>
+        <p id="lightbox-specs" class="text-[11px] text-gray-300 mt-0.5 line-clamp-2"></p>
+      </div>
+      <button type="button" id="lightbox-add-btn" class="shrink-0 bg-white text-black text-xs font-bold px-4 py-2.5 rounded-xl hover:bg-gray-200 transition">
+        + เพิ่มลงตะกร้า
+      </button>
+    </div>
+  </div>
+
+  <!-- หน้าต่างสรุปคำสั่งซื้อหลังโอนสำเร็จ (Receipt Modal) -->
+  <div id="receipt-modal" onclick="if(event.target === this) closeReceiptModal()" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-xl space-y-4">
+      <div class="text-center space-y-1">
+        <div class="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto text-2xl font-bold">
+          ✓
+        </div>
+        <h3 class="text-lg font-bold text-gray-900">สั่งซื้อและแจ้งโอนสำเร็จ!</h3>
+        <p class="text-xs text-gray-500" id="receipt-time"></p>
+      </div>
+
+      <div class="bg-gray-50 rounded-xl p-3.5 text-xs space-y-2 border border-gray-100">
+        <div>
+          <span class="text-gray-400 block">ผู้รับสินค้า:</span>
+          <span class="font-semibold text-gray-800" id="receipt-name"></span> (<span id="receipt-phone"></span>)
+        </div>
+        <div>
+          <span class="text-gray-400 block">ที่อยู่จัดส่ง:</span>
+          <span class="text-gray-700" id="receipt-address"></span>
+        </div>
+        <div class="border-t pt-2">
+          <span class="text-gray-400 block mb-1">รายการสินค้า:</span>
+          <div id="receipt-items" class="space-y-1 text-gray-700"></div>
+        </div>
+        <div class="border-t pt-2 flex justify-between font-bold text-sm text-gray-900">
+          <span>ยอดโอนสุทธิ</span>
+          <span id="receipt-total" class="text-green-600"></span>
+        </div>
+      </div>
+
+      <p class="text-[11px] text-center text-gray-500 leading-relaxed">
+        * ระบบจะตัดสต็อกเมื่อร้านค้าตรวจสอบยอดโอนเรียบร้อยแล้ว (สิทธิ์เป็นของผู้ที่โอนชำระถูกต้องก่อน) สามารถเช็กสถานะได้ที่ปุ่ม <b>"📦 เช็กพัสดุ"</b> ด้านบนครับ
+      </p>
+
+      <div class="flex gap-2">
+        <button type="button" id="receipt-track-btn" class="flex-1 bg-gray-100 text-gray-800 py-2.5 rounded-lg text-xs font-semibold hover:bg-gray-200 transition">
+          📦 เช็กสถานะออเดอร์
+        </button>
+        <button type="button" onclick="closeReceiptModal()" class="flex-1 bg-black text-white py-2.5 rounded-lg text-xs font-semibold hover:bg-gray-800 transition">
+          ตกลง / ปิดหน้าต่าง
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ==========================================
+    // 1. ตั้งค่า Configuration, ชื่อร้าน และช่องทางติดต่อ
+    // ==========================================
+    const CONFIG = {
+      STORE_NAME: 'MY BRAND STORE',
+      STORE_TAGLINE: 'พวงกุญแจอะคริลิกอนิเมะ งานพิมพ์คมชัด พร้อมส่งทุกชิ้น',
+
+      // ใส่ลิงก์ช่องทางติดต่อร้านค้า (ช่องทางไหนไม่ได้ใช้ให้ปล่อยว่าง '')
+      CONTACT_LINE: 'https://line.me/ti/p/~yourlineid',
+      CONTACT_FACEBOOK: 'https://facebook.com/yourpage',
+      CONTACT_TIKTOK: 'https://tiktok.com/@yourshop',
+      CONTACT_INSTAGRAM: '',
+
+      // ข้อมูลรับชำระเงินและ Supabase
+      PROMPTPAY_ID: '0620659047',
+      ACCOUNT_NAME: 'นาย จีรวัตร ไร่เจริญ',
+      SUPABASE_URL: 'https://wspjpfbsxqkdfpbkmuli.supabase.co',
+      SUPABASE_ANON_KEY: 'sb_publishable_Mrm11hWWmdJV-xWoyTbYUQ_16HHR3Sg',
+
+      // แถบโปรโมชันกระตุ้นยอดซื้อ (ใส่ 0 เพื่อปิด)
+      UPSELL_TARGET_QTY: 3,
+      UPSELL_REWARD_TEXT: 'ฟรี! สติกเกอร์อนิเมะ 1 แผ่น'
+    };
+
+    document.title = CONFIG.STORE_NAME;
+    document.getElementById('header-store-name').textContent = CONFIG.STORE_NAME;
+    document.getElementById('footer-store-name').textContent = CONFIG.STORE_NAME;
+    document.getElementById('footer-copy-name').textContent = CONFIG.STORE_NAME;
+    document.getElementById('footer-tagline').textContent = CONFIG.STORE_TAGLINE;
+    document.getElementById('footer-year').textContent = new Date().getFullYear();
+
+    document.getElementById('promptpay-display').textContent = CONFIG.PROMPTPAY_ID;
+    document.getElementById('account-name-display').textContent = CONFIG.ACCOUNT_NAME;
+
+    function renderSocialLinks() {
+      const container = document.getElementById('social-links-container');
+      const channels = [
+        { label: 'LINE Official', url: CONFIG.CONTACT_LINE, style: 'bg-[#06C755] text-white hover:opacity-90', icon: '💬' },
+        { label: 'Facebook', url: CONFIG.CONTACT_FACEBOOK, style: 'bg-[#1877F2] text-white hover:opacity-90', icon: '📘' },
+        { label: 'TikTok', url: CONFIG.CONTACT_TIKTOK, style: 'bg-black text-white hover:bg-gray-800', icon: '🎵' },
+        { label: 'Instagram', url: CONFIG.CONTACT_INSTAGRAM, style: 'bg-gradient-to-r from-purple-600 to-pink-500 text-white hover:opacity-90', icon: '📸' }
+      ];
+
+      container.innerHTML = channels
+        .filter(c => c.url && c.url.trim() !== '')
+        .map(c => `
+          <a href="${c.url}" target="_blank" rel="noopener noreferrer" class="${c.style} text-xs font-medium px-3.5 py-2 rounded-full transition inline-flex items-center gap-1.5 shadow-sm">
+            <span>${c.icon}</span>
+            <span>${c.label}</span>
+          </a>
+        `).join('');
+    }
+    renderSocialLinks();
+
+    function copyPromptPay() {
+      navigator.clipboard.writeText(CONFIG.PROMPTPAY_ID);
+      alert('คัดลอกเบอร์พร้อมเพย์ ' + CONFIG.PROMPTPAY_ID + ' เรียบร้อยแล้ว');
+    }
+
+    const supabaseClient = typeof supabase !== 'undefined'
+      ? supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY)
+      : null;
+
+    const CART_STORAGE_KEY = 'my_minimal_store_cart_v1';
+
+    // ข้อมูลสินค้าทั้ง 31 ชิ้น (24 ชิ้นเดิม + 7 ชิ้นใหม่)
+    const fallbackProducts = [
+      { id: 1, name: 'พวงกุญแจอะคริลิก Naruto ทีม 7', price: 20, img: 'naruto001.JPG', stock: 1, specs: 'ขนาดประมาณ 5.5 x 6 ซม. | อะคริลิกใสหนา 3 มม. | มีเพียง 1 ชิ้น' },
+      { id: 2, name: 'พวงกุญแจอะคริลิก One Piece ซาโบ้', price: 20, img: 'onepices001.JPG', stock: 1, specs: 'ขนาดประมาณ 5.5 x 6 ซม. | อะคริลิกใสหนา 3 มม. | มีเพียง 1 ชิ้น' },
+      { id: 3, name: 'พวงกุญแจอะคริลิก Dragon Ball โกคูแบล็ค', price: 20, img: 'dragonball001.JPG', stock: 1, specs: 'ขนาดประมาณ 5.5 x 6 ซม. | อะคริลิกใสหนา 3 มม. | มีเพียง 1 ชิ้น' },
+      { id: 4, name: 'พวงกุญแจอะคริลิก Gundam RX-78-2', price: 20, img: 'gundam001.jpg', stock: 1, specs: 'ขนาดประมาณ 5.5 x 6 ซม. | อะคริลิกใสหนา 3 มม. | มีเพียง 1 ชิ้น' },
+      { id: 5, name: 'พวงกุญแจอะคริลิก One Piece คาเวนดิช', price: 20, img: 'onepices002.jpg', stock: 1, specs: 'ขนาดประมาณ 5.5 x 6 ซม. | อะคริลิกใสหนา 3 มม. | มีเพียง 1 ชิ้น' },
+      { id: 6, name: 'พวงกุญแจอะคริลิก One Piece โคสึกิ โอเด้ง', price: 20, img: 'onepices003.jpg', stock: 1, specs: 'ขนาดประมาณ 5.5 x 6 ซม. | อะคริลิกใสหนา 3 มม. | มีเพียง 1 ชิ้น' },
+      { id: 7, name: 'พวงกุญแจอะคริลิก One Piece ซิลเวอร์ส เรย์ลี่', price: 20, img: 'onepices004.jpg', stock: 1, specs: 'ขนาดประมาณ 5.5 x 6 ซม. | อะคริลิกใสหนา 3 มม. | มีเพียง 1 ชิ้น' },
+      { id: 8, name: 'พวงกุญแจอะคริลิก One Piece จินเบ', price: 20, img: 'onepices005.jpg', stock: 1, specs: 'ขนาดประมาณ 5.5 x 6 ซม. | อะคริลิกใสหนา 3 มม. | มีเพียง 1 ชิ้น' },
+      { id: 9, name: 'พวงกุญแจอะคริลิก One Piece แชงค์ส & บากี้', price: 20, img: 'onepices006.jpg', stock: 1, specs: 'ขนาดประมาณ 5.5 x 6 ซม. | อะคริลิกใสหนา 3 มม. | มีเพียง 1 ชิ้น' },
+      { id: 10, name: 'พวงกุญแจอะคริลิก One Piece ลูฟี่ & อิวานคอฟ', price: 20, img: 'onepices007.jpg', stock: 1, specs: 'ขนาดประมาณ 5.5 x 6 ซม. | อะคริลิกใสหนา 3 มม. | มีเพียง 1 ชิ้น' },
+      { id: 11, name: 'พวงกุญแจอะคริลิก One Piece อาโอคิยิ คุซัน', price: 20, img: 'onepices008.jpg', stock: 1, specs: 'ขนาดประมาณ 5.5 x 6 ซม. | อะคริลิกใสหนา 3 มม. | มีเพียง 1 ชิ้น' },
+      { id: 12, name: 'พวงกุญแจอะคริลิก One Piece โรโรโนอา โซโล', price: 20, img: 'onepices009.jpg', stock: 1, specs: 'ขนาดประมาณ 5.5 x 6 ซม. | อะคริลิกใสหนา 3 มม. | มีเพียง 1 ชิ้น' },
+      { id: 13, name: 'พวงกุญแจอะคริลิก One Piece กิง (บาราติเอ)', price: 20, img: 'onepices010.jpg', stock: 1, specs: 'ขนาดประมาณ 5.5 x 6 ซม. | อะคริลิกใสหนา 3 มม. | มีเพียง 1 ชิ้น' },
+      { id: 14, name: 'พวงกุญแจอะคริลิก Pokémon โซเบลดส์', price: 20, img: 'pokemon001.jpg', stock: 1, specs: 'ขนาดประมาณ 5.5 x 6 ซม. | อะคริลิกใสหนา 3 มม. | มีเพียง 1 ชิ้น' },
+      { id: 15, name: 'พวงกุญแจอะคริลิก One Piece ก็อด เอเนล', price: 20, img: 'onepices011.jpg', stock: 1, specs: 'ขนาดประมาณ 5.5 x 6 ซม. | อะคริลิกใสหนา 3 มม. | มีเพียง 1 ชิ้น' },
+      { id: 16, name: 'พวงกุญแจอะคริลิก One Piece ลูฟี่ & บากี้ (ล็อกทาวน์)', price: 20, img: 'onepices012.jpg', stock: 1, specs: 'ขนาดประมาณ 5.5 x 6 ซม. | อะคริลิกใสหนา 3 มม. | มีเพียง 1 ชิ้น' },
+      { id: 17, name: 'พวงกุญแจอะคริลิก One Piece ลูฟี่ (ยังมีพวกพ้องอยู่)', price: 20, img: 'onepices013.jpg', stock: 1, specs: 'ขนาดประมาณ 5.5 x 6 ซม. | อะคริลิกใสหนา 3 มม. | มีเพียง 1 ชิ้น' },
+      { id: 18, name: 'พวงกุญแจอะคริลิก One Piece อุซป (อลาบาสต้า)', price: 20, img: 'onepices014.jpg', stock: 1, specs: 'ขนาดประมาณ 5.5 x 6 ซม. | อะคริลิกใสหนา 3 มม. | มีเพียง 1 ชิ้น' },
+      { id: 19, name: 'พวงกุญแจอะคริลิก One Piece อูตะ (Uta)', price: 20, img: 'onepices015.jpg', stock: 1, specs: 'ขนาดประมาณ 5.5 x 6 ซม. | อะคริลิกใสหนา 3 มม. | มีเพียง 1 ชิ้น' },
+      { id: 20, name: 'พวงกุญแจอะคริลิก One Piece ช็อปเปอร์ (การ์ดพอยต์)', price: 20, img: 'onepices016.jpg', stock: 1, specs: 'ขนาดประมาณ 5.5 x 6 ซม. | อะคริลิกใสหนา 3 มม. | มีเพียง 1 ชิ้น' },
+      { id: 21, name: 'พวงกุญแจอะคริลิก One Piece จิวเวลรี่ บอนนี่', price: 20, img: 'onepices017.jpg', stock: 1, specs: 'ขนาดประมาณ 5.5 x 6 ซม. | อะคริลิกใสหนา 3 มม. | มีเพียง 1 ชิ้น' },
+      { id: 22, name: 'พวงกุญแจอะคริลิก One Piece ช็อปเปอร์ (เกาะดรัม)', price: 20, img: 'onepices018.jpg', stock: 1, specs: 'ขนาดประมาณ 5.5 x 6 ซม. | อะคริลิกใสหนา 3 มม. | มีเพียง 1 ชิ้น' },
+      { id: 23, name: 'พวงกุญแจอะคริลิก One Piece ลูฟี่ ปะทะ คร็อกโคไดล์', price: 20, img: 'onepices019.jpg', stock: 1, specs: 'ขนาดประมาณ 5.5 x 6 ซม. | อะคริลิกใสหนา 3 มม. | มีเพียง 1 ชิ้น' },
+      { id: 24, name: 'พวงกุญแจอะคริลิก One Piece โซเงคิง (Sogeking)', price: 20, img: 'onepices020.jpg', stock: 1, specs: 'ขนาดประมาณ 5.5 x 6 ซม. | อะคริลิกใสหนา 3 มม. | มีเพียง 1 ชิ้น' },
+      { id: 25, name: 'พวงกุญแจอะคริลิก Disney แมวมารี (Marie)', price: 20, img: 'locana001.jpg', stock: 1, specs: 'ขนาดประมาณ 5.5 x 6 ซม. | อะคริลิกใสหนา 3 มม. | มีเพียง 1 ชิ้น' },
+      { id: 26, name: 'พวงกุญแจอะคริลิก Naruto นารูโตะ & ซาสึเกะ', price: 20, img: 'naruto003.jpg', stock: 1, specs: 'ขนาดประมาณ 5.5 x 6 ซม. | อะคริลิกใสหนา 3 มม. | มีเพียง 1 ชิ้น' },
+      { id: 27, name: 'พวงกุญแจอะคริลิก One Piece บรู๊ค (Soul King)', price: 20, img: 'onepices021.jpg', stock: 1, specs: 'ขนาดประมาณ 5.5 x 6 ซม. | อะคริลิกใสหนา 3 มม. | มีเพียง 1 ชิ้น' },
+      { id: 28, name: 'พวงกุญแจอะคริลิก Pokémon วิคทินี (Victini)', price: 20, img: 'pokemon002.jpg', stock: 1, specs: 'ขนาดประมาณ 5.5 x 6 ซม. | อะคริลิกใสหนา 3 มม. | มีเพียง 1 ชิ้น' },
+      { id: 29, name: 'พวงกุญแจอะคริลิก Naruto ชิกามารุ อิโนะ โจจิ', price: 20, img: 'naruto002.jpg', stock: 1, specs: 'ขนาดประมาณ 5.5 x 6 ซม. | อะคริลิกใสหนา 3 มม. | มีเพียง 1 ชิ้น' },
+      { id: 30, name: 'พวงกุญแจอะคริลิก Gundam ฟารัคท์ (Pharact)', price: 20, img: 'gundam002.jpg', stock: 1, specs: 'ขนาดประมาณ 5.5 x 6 ซม. | อะคริลิกใสหนา 3 มม. | มีเพียง 1 ชิ้น' },
+      { id: 31, name: 'พวงกุญแจอะคริลิก One Piece ช็อปเปอร์ & ดร.ฮิลรุค', price: 20, img: 'onepices022.jpg', stock: 1, specs: 'ขนาดประมาณ 5.5 x 6 ซม. | อะคริลิกใสหนา 3 มม. | มีเพียง 1 ชิ้น' }
+    ];
+
+    let products = [];
+    let cart = loadCartFromStorage();
+    let currentTotalAmount = 0;
+
+    function loadCartFromStorage() {
+      try {
+        const saved = localStorage.getItem(CART_STORAGE_KEY);
+        return saved ? JSON.parse(saved) : [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function saveCartToStorage() {
+      try {
+        localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+      } catch (e) {
+        console.error('Cannot save cart to localStorage', e);
+      }
+    }
+
+    function calculateShipping(totalQty) {
+      if (totalQty === 0) return 0;
+      return totalQty <= 10 ? 30 : 50;
+    }
+
+    // ==========================================
+    // 2. โหลดข้อมูลสินค้าและสต็อกจาก Supabase
+    // ==========================================
+    async function fetchProducts() {
+      if (products.length === 0) {
+        products = fallbackProducts;
+        syncCartWithStock();
+        renderProducts();
+        updateCartUI();
+      }
+
+      if (!supabaseClient) return;
+
+      try {
+        const { data, error } = await supabaseClient
+          .from('products')
+          .select('*')
+          .order('id', { ascending: true });
+
+        if (!error && data && data.length > 0) {
+          products = data;
+          syncCartWithStock();
+          renderProducts();
+          updateCartUI();
+        }
+      } catch (err) {
+        console.error('โหลดสต็อกจาก Supabase ไม่สำเร็จ:', err);
+      }
+    }
+
+    function syncCartWithStock() {
+      cart = cart
+        .map(item => {
+          const prod = products.find(p => p.id === item.id);
+          if (!prod || prod.stock <= 0) return null;
+          return {
+            ...prod,
+            qty: Math.min(item.qty, prod.stock)
+          };
+        })
+        .filter(Boolean);
+      saveCartToStorage();
+    }
+
+    // ==========================================
+    // 3. ระบบเช็กสถานะออเดอร์และเลขพัสดุ (Order Tracking)
+    // ==========================================
+    function openTrackingModal(prefillPhone = '') {
+      document.getElementById('tracking-modal').classList.remove('hidden');
+      const input = document.getElementById('track-phone-input');
+      if (prefillPhone) {
+        input.value = prefillPhone;
+        searchOrdersByPhone(prefillPhone);
+      } else {
+        input.focus();
+      }
+    }
+
+    function closeTrackingModal() {
+      document.getElementById('tracking-modal').classList.add('hidden');
+    }
+
+    function copyTrackingNumber(trackingNo) {
+      navigator.clipboard.writeText(trackingNo);
+      alert('คัดลอกเลขพัสดุ ' + trackingNo + ' เรียบร้อยแล้ว');
+    }
+
+    function getStatusStepHtml(statusText) {
+      const status = (statusText || 'รอตรวจสอบสลิป').trim();
+
+      if (status.includes('ยกเลิก') || status.includes('ไม่ถูกต้อง')) {
+        return `
+          <div class="bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-2 rounded-lg font-medium">
+            ⚠️ สถานะ: ${status} (กรุณาติดต่อร้านค้า)
+          </div>
+        `;
+      }
+
+      let currentStep = 1;
+      if (status.includes('จัดส่ง') || status.includes('ส่งแล้ว') || status.includes('สำเร็จ')) {
+        currentStep = 3;
+      } else if (status.includes('แพ็ก') || status.includes('เตรียม') || status.includes('ยืนยัน') || status.includes('ตรวจสอบแล้ว')) {
+        currentStep = 2;
+      }
+
+      const steps = [
+        { num: 1, label: 'รอตรวจสลิป' },
+        { num: 2, label: 'กำลังแพ็กของ' },
+        { num: 3, label: 'จัดส่งแล้ว' }
+      ];
+
+      return `
+        <div class="grid grid-cols-3 gap-1.5 text-center text-[11px]">
+          ${steps.map(s => {
+            const isActive = s.num <= currentStep;
+            return `
+              <div class="py-1.5 px-1 rounded-lg font-medium ${isActive ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-400'}">
+                ${s.num <= currentStep ? '✓ ' : ''}${s.label}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    async function searchOrdersByPhone(phoneRaw) {
+      const resultsEl = document.getElementById('tracking-results');
+      const btn = document.getElementById('track-search-btn');
+
+      btn.disabled = true;
+      btn.textContent = 'กำลังค้นหา...';
+      resultsEl.innerHTML = '<p class="text-center text-gray-400 text-xs py-6">กำลังค้นหาข้อมูลคำสั่งซื้อ...</p>';
+
+      try {
+        const { data, error } = await supabaseClient.rpc('track_orders_by_phone', {
+          search_phone: phoneRaw
+        });
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+          resultsEl.innerHTML = `
+            <div class="text-center py-8 space-y-1">
+              <p class="text-gray-700 font-medium text-sm">ไม่พบคำสั่งซื้อสำหรับเบอร์นี้</p>
+              <p class="text-gray-400 text-xs">กรุณาตรวจสอบเบอร์โทรศัพท์ให้ตรงกับตอนที่สั่งซื้อ</p>
+            </div>
+          `;
+          return;
+        }
+
+        resultsEl.innerHTML = data.map(order => {
+          const dateStr = new Date(order.created_at).toLocaleString('th-TH', {
+            dateStyle: 'medium',
+            timeStyle: 'short'
+          });
+
+          const items = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || []);
+          const itemsSummary = items.map(i => `${i.name} (x${i.qty})`).join(', ');
+          const hasTracking = order.tracking_number && order.tracking_number.trim() !== '';
+
+          return `
+            <div class="border border-gray-200 rounded-xl p-3.5 space-y-2.5 bg-white shadow-sm">
+              <div class="flex justify-between items-start gap-2">
+                <div>
+                  <span class="font-bold text-gray-900 text-sm">คำสั่งซื้อ #${order.order_id}</span>
+                  <span class="text-[11px] text-gray-400 block">${dateStr} • ${order.masked_name}</span>
+                </div>
+                <span class="font-bold text-gray-900 text-sm">${Number(order.total_amount).toLocaleString()} ฿</span>
+              </div>
+
+              ${getStatusStepHtml(order.status)}
+
+              <p class="text-xs text-gray-600 bg-gray-50 p-2 rounded-lg">
+                <span class="text-gray-400">รายการ:</span> ${itemsSummary}
+              </p>
+
+              ${hasTracking ? `
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-2.5 flex items-center justify-between gap-2">
+                  <div class="min-w-0">
+                    <span class="text-[11px] text-blue-600 font-medium block">${order.courier_name || 'เลขพัสดุจัดส่ง'}</span>
+                    <span class="font-bold text-blue-900 text-sm tracking-wide select-all">${order.tracking_number}</span>
+                  </div>
+                  <button type="button" onclick="copyTrackingNumber('${order.tracking_number.replace(/'/g, "\\'")}')" class="shrink-0 bg-blue-600 text-white text-xs px-3 py-1.5 rounded-lg hover:bg-blue-700 transition">
+                    คัดลอกเลข
+                  </button>
+                </div>
+              ` : `
+                <p class="text-[11px] text-gray-400 text-center pt-0.5">
+                  เลขพัสดุจะแสดงที่นี่เมื่อร้านค้าจัดส่งสินค้าแล้ว
+                </p>
+              `}
+            </div>
+          `;
+        }).join('');
+
+      } catch (err) {
+        console.error(err);
+        resultsEl.innerHTML = `<p class="text-center text-red-500 text-xs py-6">เกิดข้อผิดพลาดในการค้นหา: ${err.message}</p>`;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'ค้นหา';
+      }
+    }
+
+    document.getElementById('tracking-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const phone = document.getElementById('track-phone-input').value.trim();
+      if (phone) {
+        searchOrdersByPhone(phone);
+      }
+    });
+
+    // ==========================================
+    // 4. ฟังก์ชันสร้าง QR Code พร้อมเพย์
+    // ==========================================
+    function crc16(str) {
+      let crc = 0xFFFF;
+      for (let i = 0; i < str.length; i++) {
+        crc ^= str.charCodeAt(i) << 8;
+        for (let j = 0; j < 8; j++) {
+          if ((crc & 0x8000) !== 0) {
+            crc = ((crc << 1) ^ 0x1021) & 0xFFFF;
+          } else {
+            crc = (crc << 1) & 0xFFFF;
+          }
+        }
+      }
+      return crc.toString(16).toUpperCase().padStart(4, '0');
+    }
+
+    function generatePromptPayPayload(target, amount) {
+      const cleanTarget = target.replace(/[^0-9]/g, '');
+      let formattedTarget = '';
+      if (cleanTarget.length === 10 && cleanTarget.startsWith('0')) {
+        formattedTarget = '01130066' + cleanTarget.substring(1);
+      } else if (cleanTarget.length === 13) {
+        formattedTarget = '0213' + cleanTarget;
+      }
+      const merchantInfo = '0016A000000677010111' + formattedTarget;
+      const tag29 = '29' + String(merchantInfo.length).padStart(2, '0') + merchantInfo;
+
+      let payload = '000201010212' + tag29 + '5303764';
+      if (amount && amount > 0) {
+        const amtStr = Number(amount).toFixed(2);
+        payload += '54' + String(amtStr.length).padStart(2, '0') + amtStr;
+      }
+      payload += '5802TH6304';
+      return payload + crc16(payload);
+    }
+
+    function updatePromptPayQR(amount) {
+      const payload = generatePromptPayPayload(CONFIG.PROMPTPAY_ID, amount);
+      document.getElementById('qr-amount-badge').textContent = amount.toLocaleString();
+      if (typeof QRCode !== 'undefined') {
+        QRCode.toDataURL(payload, { width: 220, margin: 1 }, function (err, url) {
+          if (!err) {
+            document.getElementById('promptpay-qr-img').src = url;
+          }
+        });
+      }
+    }
+
+    function downloadQR() {
+      const imgSrc = document.getElementById('promptpay-qr-img').src;
+      if (!imgSrc) return;
+      const link = document.createElement('a');
+      link.href = imgSrc;
+      link.download = `PromptPay_${currentTotalAmount}THB.png`;
+      link.click();
+    }
+
+    // ==========================================
+    // 5. ระบบขยายรูปเต็มจอ + ซูมภาพและลากเลื่อน (Image Lightbox)
+    // ==========================================
+    let zoomState = {
+      isZoomed: false,
+      isDragging: false,
+      hasMoved: false,
+      startX: 0,
+      startY: 0,
+      translateX: 0,
+      translateY: 0
+    };
+
+    const lightboxImg = document.getElementById('lightbox-img');
+    const lightboxZoomBtn = document.getElementById('lightbox-zoom-btn');
+
+    function applyLightboxTransform() {
+      if (zoomState.isZoomed) {
+        lightboxImg.style.transform = `translate(${zoomState.translateX}px, ${zoomState.translateY}px) scale(2.2)`;
+        lightboxImg.classList.remove('cursor-zoom-in');
+        lightboxImg.classList.add('cursor-grab');
+        lightboxZoomBtn.textContent = '🔎 ย่อกลับ (1x)';
+      } else {
+        zoomState.translateX = 0;
+        zoomState.translateY = 0;
+        lightboxImg.style.transform = 'translate(0px, 0px) scale(1)';
+        lightboxImg.classList.remove('cursor-grab', 'cursor-grabbing');
+        lightboxImg.classList.add('cursor-zoom-in');
+        lightboxZoomBtn.textContent = '🔍 ซูมขยาย (2x)';
+      }
+    }
+
+    function toggleLightboxZoom(forceState) {
+      zoomState.isZoomed = typeof forceState === 'boolean' ? forceState : !zoomState.isZoomed;
+      if (!zoomState.isZoomed) {
+        zoomState.translateX = 0;
+        zoomState.translateY = 0;
+      }
+      applyLightboxTransform();
+    }
+
+    lightboxImg.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      zoomState.isDragging = true;
+      zoomState.hasMoved = false;
+      zoomState.startX = e.clientX - zoomState.translateX;
+      zoomState.startY = e.clientY - zoomState.translateY;
+      if (zoomState.isZoomed) {
+        lightboxImg.style.transition = 'none';
+        lightboxImg.classList.add('cursor-grabbing');
+      }
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!zoomState.isDragging) return;
+      const dx = e.clientX - zoomState.startX;
+      const dy = e.clientY - zoomState.startY;
+      if (Math.abs(dx - zoomState.translateX) > 4 || Math.abs(dy - zoomState.translateY) > 4) {
+        zoomState.hasMoved = true;
+      }
+      if (zoomState.isZoomed) {
+        zoomState.translateX = dx;
+        zoomState.translateY = dy;
+        lightboxImg.style.transform = `translate(${dx}px, ${dy}px) scale(2.2)`;
+      }
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (!zoomState.isDragging) return;
+      zoomState.isDragging = false;
+      lightboxImg.style.transition = 'transform 0.2s ease-out';
+      lightboxImg.classList.remove('cursor-grabbing');
+      if (!zoomState.hasMoved) {
+        toggleLightboxZoom();
+      }
+    });
+
+    lightboxImg.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 1) return;
+      const touch = e.touches[0];
+      zoomState.isDragging = true;
+      zoomState.hasMoved = false;
+      zoomState.startX = touch.clientX - zoomState.translateX;
+      zoomState.startY = touch.clientY - zoomState.translateY;
+      if (zoomState.isZoomed) {
+        lightboxImg.style.transition = 'none';
+      }
+    }, { passive: true });
+
+    lightboxImg.addEventListener('touchmove', (e) => {
+      if (!zoomState.isDragging || e.touches.length !== 1) return;
+      const touch = e.touches[0];
+      const dx = touch.clientX - zoomState.startX;
+      const dy = touch.clientY - zoomState.startY;
+      if (Math.abs(dx - zoomState.translateX) > 5 || Math.abs(dy - zoomState.translateY) > 5) {
+        zoomState.hasMoved = true;
+      }
+      if (zoomState.isZoomed) {
+        e.preventDefault();
+        zoomState.translateX = dx;
+        zoomState.translateY = dy;
+        lightboxImg.style.transform = `translate(${dx}px, ${dy}px) scale(2.2)`;
+      }
+    }, { passive: false });
+
+    lightboxImg.addEventListener('touchend', (e) => {
+      if (!zoomState.isDragging) return;
+      zoomState.isDragging = false;
+      lightboxImg.style.transition = 'transform 0.2s ease-out';
+      if (!zoomState.hasMoved) {
+        e.preventDefault();
+        toggleLightboxZoom();
+      }
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (!document.getElementById('image-lightbox').classList.contains('hidden')) closeImageLightbox();
+        if (!document.getElementById('tracking-modal').classList.contains('hidden')) closeTrackingModal();
+      }
+    });
+
+    function openImageLightbox(productId) {
+      const p = products.find(item => item.id === productId);
+      if (!p) return;
+
+      const isOutOfStock = p.stock <= 0;
+      toggleLightboxZoom(false);
+
+      lightboxImg.src = p.img;
+      lightboxImg.alt = p.name;
+      document.getElementById('lightbox-name').textContent = p.name;
+      document.getElementById('lightbox-price').textContent = `${Number(p.price).toLocaleString()} ฿`;
+      document.getElementById('lightbox-specs').textContent = `${p.specs || 'พวงกุญแจอะคริลิกคุณภาพดี'} (${isOutOfStock ? 'สินค้าหมด' : `คงเหลือ ${p.stock} ชิ้น`})`;
+
+      const addBtn = document.getElementById('lightbox-add-btn');
+      addBtn.disabled = isOutOfStock;
+      addBtn.textContent = isOutOfStock ? 'สินค้าหมด' : '+ เพิ่มลงตะกร้า';
+      addBtn.className = `shrink-0 text-xs font-bold px-4 py-2.5 rounded-xl transition ${isOutOfStock ? 'bg-gray-600 text-gray-300 cursor-not-allowed' : 'bg-white text-black hover:bg-gray-200'}`;
+      addBtn.onclick = () => {
+        addToCart(p.id);
+        closeImageLightbox();
+      };
+
+      document.getElementById('image-lightbox').classList.remove('hidden');
+    }
+
+    function closeImageLightbox() {
+      toggleLightboxZoom(false);
+      document.getElementById('image-lightbox').classList.add('hidden');
+    }
+
+    // ==========================================
+    // 6. ระบบแสดงสินค้าและจัดการตะกร้า
+    // ==========================================
+    function renderProducts() {
+      const list = document.getElementById('product-list');
+      list.innerHTML = products.map(p => {
+        const isOutOfStock = p.stock <= 0;
+        return `
+        <div class="bg-white rounded-xl overflow-hidden shadow-sm border border-gray-100 flex flex-col ${isOutOfStock ? 'opacity-75' : ''}">
+          <div onclick="openImageLightbox(${p.id})" class="relative cursor-zoom-in group bg-gray-100 overflow-hidden">
+            <img src="${p.img}" alt="${p.name}" class="w-full h-48 object-contain p-2 transition duration-200 group-hover:scale-105">
+            <span class="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] px-2.5 py-0.5 rounded-full">
+              🔍 ขยายรูป
+            </span>
+            ${isOutOfStock ? `
+              <div class="absolute inset-0 bg-black/50 flex items-center justify-center">
+                <span class="bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow">สินค้าหมด</span>
+              </div>
+            ` : ''}
+          </div>
+          <div class="p-4 flex-1 flex flex-col justify-between">
+            <div>
+              <h3 onclick="openImageLightbox(${p.id})" class="font-medium text-gray-900 cursor-pointer hover:underline">${p.name}</h3>
+              <div class="flex items-center justify-between mt-1">
+                <p class="text-gray-800 font-bold">${Number(p.price).toLocaleString()} ฿</p>
+                <span class="text-[11px] px-2 py-0.5 rounded-full ${isOutOfStock ? 'bg-red-50 text-red-600 font-medium' : 'bg-gray-100 text-gray-600'}">
+                  ${isOutOfStock ? 'สินค้าหมด' : `มีเพียง ${p.stock} ชิ้น`}
+                </span>
+              </div>
+            </div>
+            <button 
+              onclick="addToCart(${p.id})" 
+              ${isOutOfStock ? 'disabled' : ''} 
+              class="mt-3 w-full text-sm py-2 rounded-lg transition ${isOutOfStock ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-900 text-white hover:bg-gray-700'}">
+              ${isOutOfStock ? 'สินค้าหมด' : '+ เพิ่มลงตะกร้า'}
+            </button>
+          </div>
+        </div>
+      `}).join('');
+    }
+
+    function addToCart(productId) {
+      const product = products.find(p => p.id === productId);
+      if (!product || product.stock <= 0) return;
+
+      const existing = cart.find(item => item.id === productId);
+      if (existing) {
+        if (existing.qty >= product.stock) {
+          alert(`สินค้า "${product.name}" มีเพียง ${product.stock} ชิ้น (อยู่ในตะกร้าแล้ว)`);
+          return;
+        }
+        existing.qty += 1;
+      } else {
+        cart.push({ ...product, qty: 1 });
+      }
+      saveCartToStorage();
+      updateCartUI();
+    }
+
+    function changeQty(productId, delta) {
+      const item = cart.find(i => i.id === productId);
+      const product = products.find(p => p.id === productId);
+      if (!item) return;
+
+      if (delta > 0 && product && item.qty >= product.stock) {
+        return;
+      }
+
+      item.qty += delta;
+      if (item.qty <= 0) {
+        cart = cart.filter(i => i.id !== productId);
+      }
+      saveCartToStorage();
+      updateCartUI();
+    }
+
+    function removeFromCart(productId) {
+      cart = cart.filter(item => item.id !== productId);
+      saveCartToStorage();
+      updateCartUI();
+    }
+
+    function updateUpsellUI(totalQty) {
+      const upsellBox = document.getElementById('upsell-box');
+      const upsellText = document.getElementById('upsell-text');
+      const upsellBar = document.getElementById('upsell-bar');
+
+      if (!CONFIG.UPSELL_TARGET_QTY || CONFIG.UPSELL_TARGET_QTY <= 0 || totalQty === 0) {
+        upsellBox.classList.add('hidden');
+        return;
+      }
+
+      upsellBox.classList.remove('hidden');
+      const target = CONFIG.UPSELL_TARGET_QTY;
+      const percent = Math.min((totalQty / target) * 100, 100);
+      upsellBar.style.width = `${percent}%`;
+
+      if (totalQty < target) {
+        const diff = target - totalQty;
+        upsellText.innerHTML = `🎁 สั่งเพิ่มอีก <b>${diff} ชิ้น</b> รับทันที <b>${CONFIG.UPSELL_REWARD_TEXT}</b>`;
+        upsellBar.classList.remove('bg-green-500');
+        upsellBar.classList.add('bg-amber-500');
+      } else {
+        upsellText.innerHTML = `🎉 ยินดีด้วย! คุณได้รับสิทธิ์ <b>${CONFIG.UPSELL_REWARD_TEXT}</b>`;
+        upsellBar.classList.remove('bg-amber-500');
+        upsellBar.classList.add('bg-green-500');
+      }
+    }
+
+    function updateCartUI() {
+      const cartItemsEl = document.getElementById('cart-items');
+      const subtotalPriceEl = document.getElementById('subtotal-price');
+      const shippingPriceEl = document.getElementById('shipping-price');
+      const shippingLabelEl = document.getElementById('shipping-label');
+      const totalPriceEl = document.getElementById('total-price');
+      const cartCountEl = document.getElementById('cart-count');
+      const paymentSection = document.getElementById('payment-section');
+
+      const totalQty = cart.reduce((sum, item) => sum + item.qty, 0);
+      const subtotalAmount = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+      const shippingFee = calculateShipping(totalQty);
+      const totalAmount = subtotalAmount + shippingFee;
+      currentTotalAmount = totalAmount;
+
+      cartCountEl.textContent = totalQty;
+      subtotalPriceEl.textContent = `${subtotalAmount.toLocaleString()} ฿`;
+      shippingPriceEl.textContent = `${shippingFee.toLocaleString()} ฿`;
+      totalPriceEl.textContent = `${totalAmount.toLocaleString()} ฿`;
+
+      updateUpsellUI(totalQty);
+
+      if (totalQty === 0) {
+        shippingLabelEl.textContent = 'ค่าจัดส่ง (1–10 ชิ้น +30 ฿ / 11+ ชิ้น +50 ฿)';
+      } else if (totalQty <= 10) {
+        shippingLabelEl.textContent = `ค่าจัดส่ง (${totalQty} ชิ้นแรก +30 ฿)`;
+      } else {
+        shippingLabelEl.textContent = `ค่าจัดส่ง (${totalQty} ชิ้น / 11+ ชิ้น +50 ฿)`;
+      }
+
+      if (cart.length === 0) {
+        cartItemsEl.innerHTML = '<p class="text-gray-400">ยังไม่มีสินค้าในตะกร้า</p>';
+        paymentSection.classList.add('hidden');
+        return;
+      }
+
+      cartItemsEl.innerHTML = cart.map(item => {
+        const prod = products.find(p => p.id === item.id);
+        const isMaxStock = prod ? item.qty >= prod.stock : true;
+        return `
+        <div class="flex justify-between items-center gap-2">
+          <div class="min-w-0">
+            <span class="font-medium text-gray-800 block truncate">${item.name}</span>
+            <span class="text-xs text-gray-500 block">${(item.price * item.qty).toLocaleString()} ฿ (${item.price} ฿/ชิ้น)</span>
+          </div>
+          <div class="flex items-center gap-1.5 shrink-0">
+            <button type="button" onclick="changeQty(${item.id}, -1)" class="w-6 h-6 rounded border border-gray-300 text-gray-700 hover:bg-gray-100 flex items-center justify-center font-bold">-</button>
+            <span class="w-5 text-center font-medium text-gray-900">${item.qty}</span>
+            <button type="button" onclick="changeQty(${item.id}, 1)" ${isMaxStock ? 'disabled' : ''} class="w-6 h-6 rounded border border-gray-300 flex items-center justify-center font-bold ${isMaxStock ? 'text-gray-300 bg-gray-50 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-100'}">+</button>
+            <button type="button" onclick="removeFromCart(${item.id})" class="text-red-500 text-xs hover:underline ml-1">ลบ</button>
+          </div>
+        </div>
+      `}).join('');
+
+      updatePromptPayQR(totalAmount);
+      paymentSection.classList.remove('hidden');
+    }
+
+    // ==========================================
+    // 7. ระบบแสดงตัวอย่างสลิป & เช็กขนาดไฟล์
+    // ==========================================
+    const slipInput = document.getElementById('slip-file');
+    const slipPreviewBox = document.getElementById('slip-preview-box');
+    const slipPreviewImg = document.getElementById('slip-preview-img');
+
+    slipInput.addEventListener('change', function () {
+      const file = this.files[0];
+      if (!file) {
+        clearSlipPreview();
+        return;
+      }
+
+      const maxSize = 5 * 1024 * 1024;
+      if (file.size > maxSize) {
+        alert('ไฟล์รูปภาพใหญ่เกิน 5MB กรุณาเลือกรูปใหม่หรือแคปหน้าจอสลิปครับ');
+        clearSlipPreview();
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        slipPreviewImg.src = e.target.result;
+        slipPreviewBox.classList.remove('hidden');
+      };
+      reader.readAsDataURL(file);
+    });
+
+    function clearSlipPreview() {
+      slipInput.value = '';
+      slipPreviewImg.src = '';
+      slipPreviewBox.classList.add('hidden');
+    }
+
+    // ==========================================
+    // 8. หน้าต่างใบเสร็จยืนยันคำสั่งซื้อ
+    // ==========================================
+    function showReceiptModal(orderData, shippingFee) {
+      const now = new Date().toLocaleString('th-TH', {
+        dateStyle: 'medium',
+        timeStyle: 'short'
+      });
+
+      document.getElementById('receipt-time').textContent = `วันที่ทำรายการ: ${now}`;
+      document.getElementById('receipt-name').textContent = orderData.customer_name;
+      document.getElementById('receipt-phone').textContent = orderData.customer_phone;
+      document.getElementById('receipt-address').textContent = orderData.shipping_address;
+
+      const itemsHtml = orderData.items.map(i => `
+        <div class="flex justify-between">
+          <span>${i.name} x${i.qty}</span>
+          <span>${(i.price * i.qty).toLocaleString()} ฿</span>
+        </div>
+      `).join('') + `
+        <div class="flex justify-between text-gray-500">
+          <span>ค่าจัดส่ง</span>
+          <span>${shippingFee.toLocaleString()} ฿</span>
+        </div>
+      `;
+
+      document.getElementById('receipt-items').innerHTML = itemsHtml;
+      document.getElementById('receipt-total').textContent = `${orderData.total_amount.toLocaleString()} ฿`;
+
+      document.getElementById('receipt-track-btn').onclick = () => {
+        closeReceiptModal();
+        openTrackingModal(orderData.customer_phone);
+      };
+
+      document.getElementById('receipt-modal').classList.remove('hidden');
+    }
+
+    function closeReceiptModal() {
+      document.getElementById('receipt-modal').classList.add('hidden');
+    }
+
+    // ==========================================
+    // 9. ระบบอัปโหลดสลิป และบันทึกออเดอร์
+    // ==========================================
+    document.getElementById('checkout-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('submit-btn');
+      btn.disabled = true;
+      btn.textContent = 'กำลังบันทึกข้อมูล...';
+
+      try {
+        const name = document.getElementById('cust-name').value.trim();
+        const phone = document.getElementById('cust-phone').value.trim();
+        const address = document.getElementById('cust-address').value.trim();
+        const file = slipInput.files[0];
+
+        const totalQty = cart.reduce((sum, item) => sum + item.qty, 0);
+        const subtotalAmount = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+        const shippingFee = calculateShipping(totalQty);
+        const totalAmount = subtotalAmount + shippingFee;
+
+        const rawExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+        const safeExt = rawExt.replace(/[^a-z0-9]/g, '') || 'jpg';
+        const fileName = `slip_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${safeExt}`;
+
+        const { error: uploadError } = await supabaseClient.storage
+          .from('slips')
+          .upload(fileName, file);
+
+        if (uploadError) throw uploadError;
+
+        const { data: urlData } = supabaseClient.storage.from('slips').getPublicUrl(fileName);
+        const slipUrl = urlData.publicUrl;
+
+        const orderPayload = {
+          customer_name: name,
+          customer_phone: phone,
+          shipping_address: address,
+          items: cart.map(i => ({ id: i.id, name: i.name, price: i.price, qty: i.qty })),
+          total_amount: totalAmount,
+          slip_url: slipUrl
+        };
+
+        const { error: dbError } = await supabaseClient.from('orders').insert([orderPayload]);
+
+        if (dbError) throw dbError;
+
+        showReceiptModal(orderPayload, shippingFee);
+
+        cart = [];
+        saveCartToStorage();
+        updateCartUI();
+        document.getElementById('checkout-form').reset();
+        clearSlipPreview();
+
+        await fetchProducts();
+
+      } catch (err) {
+        console.error(err);
+        alert('เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'ยืนยันการสั่งซื้อ';
+      }
+    });
+
+    fetchProducts();
+  </script>
+</body>
+</html>
